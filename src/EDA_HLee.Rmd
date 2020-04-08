@@ -1,0 +1,98 @@
+---
+title: "EDA _ HLee"
+author: "Hyunjoon Lee"
+date: "4/8/2020"
+output: html_document
+---
+data$sex <- as.factor (data$sex) 
+       data$isFemale<- as.numeric (data$sex)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+```{r}
+afr_crisis <- read.csv(file = 'african_crises.csv')
+afr_crisis <- afr_crisis %>% mutate(banking_crisis = ifelse(banking_crisis == "crisis", 1, 0))
+afr_crisis$currency_crises[afr_crisis$currency_crises == 2] <- 1
+head(afr_crisis)
+```
+```{r}
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+cols = gg_color_hue(13)
+```
+```{r}
+afr_crisis %>% 
+    group_by(country) %>%
+    summarize(percent = sum(systemic_crisis) / length(systemic_crisis)) -> afr_crisis_sys
+
+ggplot(afr_crisis_sys, aes(x = country, y = percent * 100, fill = country)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Countries") + ylab("Crisis (%)") + ggtitle("Percent Systemic Crisis by Country") +
+  geom_text(aes(y = percent* 100 + 2, label = round(percent * 100, 1))) + scale_color_manual(values=cols)
+```
+```{r}
+afr_crisis %>% 
+    group_by(country) %>%
+    summarize(percent = sum(currency_crises) / length(currency_crises)) -> afr_crisis_curr
+
+ggplot(afr_crisis_curr, aes(x = country, y = percent * 100, fill = country)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Countries") + ylab("Crisis (%)") + ggtitle("Percent Currency Crisis by Country") +
+  geom_text(aes(y = percent* 100 + 2, label = round(percent * 100, 1))) + scale_color_manual(values=cols)
+```
+```{r}
+afr_crisis %>% 
+    group_by(country) %>%
+    summarize(percent = sum(inflation_crises) / length(inflation_crises)) -> afr_crisis_inflat
+
+ggplot(afr_crisis_inflat, aes(x = country, y = percent * 100, fill = country)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Countries") + ylab("Crisis (%)") + ggtitle("Percent Inflation Crisis by Country") +
+  geom_text(aes(y = percent* 100 + 2, label = round(percent * 100, 1))) + scale_color_manual(values=cols)
+```
+```{r}
+afr_crisis %>% 
+    group_by(country) %>%
+    summarize(percent = sum(banking_crisis) / length(banking_crisis)) -> afr_crisis_banking
+
+ggplot(afr_crisis_banking, aes(x = country, y = percent * 100, fill = country)) + geom_bar(stat = "identity") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + xlab("Countries") + ylab("Crisis (%)") + ggtitle("Percent Banking Crisis by Country") +
+  geom_text(aes(y = percent* 100 + 2, label = round(percent * 100, 1))) + scale_color_manual(values=cols)
+```
+```{r}
+density_plot1 <- ggplot(data=afr_crisis) + geom_density(aes(x=exch_usd, group=currency_crises, fill=currency_crises), alpha=0.5, adjust=2) + 
+    theme_bw() + xlab("Exchange Rate USD (0 = No Crisis, 1 = Crisis)") + ylab("Density") + facet_grid(~currency_crises) + theme(legend.position = "none")
+density_plot1
+```
+```{r}
+density_plot2 <- ggplot(data=afr_crisis) + geom_density(aes(x=log(inflation_annual_cpi + 0.00001), group=inflation_crises, fill= factor(inflation_crises)), alpha=0.5, adjust=2) + theme_bw() + xlab("Inflation Annual CPI") + ylab("Density")
+density_plot2
+```
+```{r}
+density_plot3 <- ggplot(data=afr_crisis) + geom_density(aes(x=exch_usd, group=banking_crisis, fill=banking_crisis), alpha=0.5, adjust=2) + 
+    theme_bw() + xlab("Exchange Rate USD (0 = No Crisis, 1 = Crisis)") + ylab("Density") + facet_grid(~banking_crisis) + theme(legend.position = "none")
+density_plot3
+```
+
+```{r}
+density_plot4 <- ggplot(data=afr_crisis) + geom_density(aes(x=log(inflation_annual_cpi + 0.00001), group=banking_crisis, fill=factor(banking_crisis)), alpha=0.5, adjust=2) + theme_bw() + xlab("Inflation Annual CPI") + ylab("Density")
+density_plot4
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
