@@ -16,12 +16,19 @@ parent_dir = dirname(getwd())
 data_dir = paste(parent_dir, "data", sep="/")
 df = read.csv(paste(data_dir, "african_crises.csv", sep="/"))
 ```
-Define multilevel model
+Preprocessing
 ```{r}
-model = glmer(systemic_crisis ~ country + (1 | year),
-             data=df,
-             family=binomial(link="logit"))
-summary(model)
+distinct.years = df %>% group_by(year) %>% summarise(n_distinct(country)) 
+valid_years = distinct.years %>% filter(.[[2]] > 12) %>% select(year)
+pre.df = df %>% mutate_at(c("exch_usd","inflation_annual_cpi"), funs(scale)) %>% inner_join(y = valid_years, by='year') %>% arrange(year)
+rownames(pre.df) <- 1:nrow(pre.df)
+write.csv(pre.df, paste(data_dir, "preprocessed_african_crises.csv", sep="/"))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Define multilevel model
+```{r}
+systemic_model = glmer(factor(systemic_crisis) ~ (1 | country ) + (1 | year) + exch_usd + factor(domestic_debt_in_default) + factor(sovereign_external_debt_default) + inflation_annual_cpi + factor(independence) + factor(currency_crises) + factor(inflation_crises),
+             data=na.omit(pre.df),
+             family=binomial(link="logit"))
+summary(systemic_model)
+```
