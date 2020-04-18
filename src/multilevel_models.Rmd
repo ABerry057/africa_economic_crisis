@@ -39,9 +39,9 @@ Define multilevel model
 systemic_model_lower = glmer(systemic_crisis ~ (1 | country ) + (1 | year),
              data=na.omit(pre.df),
              family=binomial(link="logit"))
-systemic_model_upper <- glmer(systemic_crisis ~ . + (1 | country ) + (1 | year) - factor(systemic_crisis) - factor(independence),
+systemic_model_upper <- glmer(systemic_crisis ~ . + (1 | country ) + (1 | year) - systemic_crisis - independence - banking_crisis - currency_crises,
              data=pre.df,
              family=binomial(link="logit"))
 step(systemic_model_lower, scope = list(lower=systemic_model_lower,upper=systemic_model_upper),direction="backward", k = 2)
-# summary(systemic_model)
+# summary(systemic_model_lower)
 ```
