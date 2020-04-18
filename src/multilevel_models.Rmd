@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(lme4)
+library(corrplot)
 ```
 Load in data:
 ```{r}
@@ -22,13 +23,25 @@ distinct.years = df %>% group_by(year) %>% summarise(n_distinct(country))
 valid_years = distinct.years %>% filter(.[[2]] > 12) %>% select(year)
 pre.df = df %>% mutate_at(c("exch_usd","inflation_annual_cpi"), funs(scale)) %>% inner_join(y = valid_years, by='year') %>% arrange(year)
 rownames(pre.df) <- 1:nrow(pre.df)
+pre.df = pre.df %>% mutate(banking_crisis = ifelse(banking_crisis == "crisis", 1, 0))
+pre.df$currency_crises[pre.df$currency_crises == 2] <- 1
 write.csv(pre.df, paste(data_dir, "preprocessed_african_crises.csv", sep="/"))
 ```
+Quick EDA
+```{r}
+pre.df %>% select(-c("country", "cc3", "case", "year")) %>% cor() -> M
+corrplot(M, method="circle")
+```
+
 
 Define multilevel model
 ```{r}
-systemic_model = glmer(factor(systemic_crisis) ~ (1 | country ) + (1 | year) + exch_usd + factor(domestic_debt_in_default) + factor(sovereign_external_debt_default) + inflation_annual_cpi + factor(independence) + factor(currency_crises) + factor(inflation_crises),
+systemic_model_lower = glmer(systemic_crisis ~ (1 | country ) + (1 | year),
              data=na.omit(pre.df),
              family=binomial(link="logit"))
-summary(systemic_model)
+systemic_model_upper <- glmer(systemic_crisis ~ . + (1 | country ) + (1 | year) - factor(systemic_crisis) - factor(independence),
+             data=pre.df,
+             family=binomial(link="logit"))
+step(systemic_model_lower, scope = list(lower=systemic_model_lower,upper=systemic_model_upper),direction="backward", k = 2)
+# summary(systemic_model)
 ```
