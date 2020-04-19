@@ -8,8 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
-library(lme4)
+library(blme)
 library(corrplot)
+library(BBmisc)
 ```
 Load in data:
 ```{r}
@@ -21,10 +22,14 @@ Preprocessing
 ```{r}
 distinct.years = df %>% group_by(year) %>% summarise(n_distinct(country)) 
 valid_years = distinct.years %>% filter(.[[2]] > 12) %>% select(year)
-pre.df = df %>% mutate_at(c("exch_usd","inflation_annual_cpi"), funs(scale)) %>% inner_join(y = valid_years, by='year') %>% arrange(year)
+df$exch_usd = normalize(df$exch_usd, method="range")
+df$inflation_annual_cpi = normalize(df$inflation_annual_cpi, method="range")
+df$gdp_weighted_default = normalize(df$gdp_weighted_default, method="range")
+pre.df = df %>% inner_join(y = valid_years, by='year') %>% arrange(year)
 rownames(pre.df) <- 1:nrow(pre.df)
 pre.df = pre.df %>% mutate(banking_crisis = ifelse(banking_crisis == "crisis", 1, 0))
 pre.df$currency_crises[pre.df$currency_crises == 2] <- 1
+
 write.csv(pre.df, paste(data_dir, "preprocessed_african_crises.csv", sep="/"))
 ```
 Quick EDA
@@ -32,16 +37,60 @@ Quick EDA
 pre.df %>% select(-c("country", "cc3", "case", "year")) %>% cor() -> M
 corrplot(M, method="circle")
 ```
+PP II
+```{r}
+pre.df = transform(pre.df,
+                       systemic_crisis = as.factor(systemic_crisis),
+                       year = as.factor(year),
+                       country = as.factor(country),
+                       banking_crisis = as.factor(banking_crisis),
+                       currency_crises = as.factor(currency_crises),
+                       inflation_crises = as.factor(inflation_crises),
+                       domestic_debt_in_default = as.factor(domestic_debt_in_default),
+                       sovereign_external_debt_default = as.factor(sovereign_external_debt_default),
+                       independence = as.factor(independence))
+```
+
+Systemic Crises
+```{r}
+systemic_model_all = bglmer(systemic_crisis ~ (1 | country ) + (1 | year) + exch_usd + inflation_annual_cpi + domestic_debt_in_default + gdp_weighted_default + sovereign_external_debt_default + inflation_crises + banking_crisis + currency_crises + independence,
+             data=pre.df,
+             family=binomial,
+             control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)) )
+summary(systemic_model_all)
+```
 
 
 Define multilevel model
 ```{r}
-systemic_model_lower = glmer(systemic_crisis ~ (1 | country ) + (1 | year),
-             data=na.omit(pre.df),
-             family=binomial(link="logit"))
-systemic_model_upper <- glmer(systemic_crisis ~ . + (1 | country ) + (1 | year) - systemic_crisis - independence - banking_crisis - currency_crises,
+systemic_model_better = bglmer(systemic_crisis ~ (1 | country ) + (1 | year) + exch_usd + inflation_crises + currency_crises + inflation_annual_cpi + domestic_debt_in_default + sovereign_external_debt_default,
              data=pre.df,
-             family=binomial(link="logit"))
-step(systemic_model_lower, scope = list(lower=systemic_model_lower,upper=systemic_model_upper),direction="backward", k = 2)
-# summary(systemic_model_lower)
+             family=binomial,
+             control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)))
+summary(systemic_model_better)
 ```
+Inflation Crises
+```{r}
+inflation_model_all = bglmer(inflation_crises ~ (1 | country ) + (1 | year) + exch_usd + inflation_annual_cpi + domestic_debt_in_default + gdp_weighted_default + sovereign_external_debt_default + systemic_crisis + banking_crisis + currency_crises + independence,
+             data=pre.df,
+             family=binomial,
+             control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)) )
+summary(inflation_model_all)
+```
+Currency Crises
+```{r}
+currency_model_all = bglmer(currency_crises ~ (1 | country ) + (1 | year) + exch_usd + inflation_annual_cpi + domestic_debt_in_default + gdp_weighted_default + sovereign_external_debt_default + systemic_crisis + banking_crisis + inflation_crises + independence,
+             data=pre.df,
+             family=binomial,
+             control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)) )
+summary(currency_model_all)
+```
+Banking Crises
+```{r}
+banking_model_all = bglmer(banking_crisis ~ (1 | country ) + (1 | year) + exch_usd + inflation_annual_cpi + domestic_debt_in_default + gdp_weighted_default + sovereign_external_debt_default + systemic_crisis + currency_crises + inflation_crises + independence,
+             data=pre.df,
+             family=binomial,
+             control=glmerControl(optimizer="bobyqa",optCtrl=list(maxfun=2e5)) )
+summary(banking_model_all)
+```
+
